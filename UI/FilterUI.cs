@@ -2,23 +2,19 @@
 using BeatSaberMarkupLanguage.Attributes;
 using BeatSaberMarkupLanguage.Components;
 using BeatSaberMarkupLanguage.Parser;
+using BetterSongList.Api;
 using BetterSongList.FilterModels;
 using BetterSongList.HarmonyPatches;
-using BetterSongList.HarmonyPatches.UI;
-using BetterSongList.SortModels;
+using BetterSongList.Sorters;
 using BetterSongList.Util;
 using HMUI;
 using IPA.Utilities;
 using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
-using System.Net;
 using System.Reflection;
-using System.Threading.Tasks;
 using TMPro;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace BetterSongList.UI {
 #if DEBUG
@@ -33,15 +29,14 @@ namespace BetterSongList.UI {
 
 		FilterUI() { }
 
-		static Dictionary<string, ISorter> sortOptions = new Dictionary<string, ISorter>() {
-			{ "Song Name", SortMethods.alphabeticalSongname },
-			{ "Download Date", SortMethods.downloadTime },
-			{ "Ranked Stars", SortMethods.stars },
-			{ "Song Length", SortMethods.songLength },
-			{ "BPM", SortMethods.bpm },
-			{ "BeatSaver Date", SortMethods.beatSaverDate },
-			{ "Default", null }
-		};
+		public static Dictionary<string, ISortFilter> sortOptions = new List<ISortFilter>() {
+			new AdaptedSortFilter("Song Name", SortMethods.alphabeticalSongname),
+			new AdaptedSortFilter("Download Date", SortMethods.downloadTime),
+			new AdaptedSortFilter("Ranked Stars", SortMethods.stars),
+			new AdaptedSortFilter("Song Length", SortMethods.songLength),
+			new AdaptedSortFilter("BPM", SortMethods.bpm),
+			new AdaptedSortFilter("BeatSaver Date", SortMethods.beatSaverDate),
+		}.ToDictionary(sorter => sorter.Name);
 
 		static Dictionary<string, IFilter> filterOptions = new Dictionary<string, IFilter>() {
 			{ "All", null },
@@ -54,7 +49,7 @@ namespace BetterSongList.UI {
 			{ "Unranked", FilterMethods.unranked },
 		};
 
-		[UIValue("_sortOptions")] static List<object> _sortOptions = sortOptions.Keys.ToList<object>();
+		[UIValue("_sortOptions")] static List<object> _sortOptions { get => sortOptions.Keys.ToList<object>(); }
 		[UIValue("_filterOptions")] static List<object> _filterOptions = filterOptions.Keys.ToList<object>();
 
 		void _SetSort(string selected) => SetSort(selected);

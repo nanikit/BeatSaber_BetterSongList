@@ -1,4 +1,6 @@
-﻿using BetterSongList.FilterModels;
+﻿using BetterSongList.Api;
+using BetterSongList.FilterModels;
+using BetterSongList.Sorters;
 using BetterSongList.SortModels;
 using BetterSongList.UI;
 using BetterSongList.Util;
@@ -20,7 +22,7 @@ namespace BetterSongList.HarmonyPatches {
 	public
 #endif
 	static class HookLevelCollectionTableSet {
-		public static ISorter sorter;
+		public static ISortFilter sorter;
 		public static IFilter filter;
 
 		public static IPreviewBeatmapLevel[] lastInMapList { get; private set; }
@@ -50,7 +52,7 @@ namespace BetterSongList.HarmonyPatches {
 				PrepareStuffIfNecessary(async () => {
 					// TODO: Maybe cancellationsource etc
 					var inList = lastInMapList;
-					await Task.Run(() => FilterWrapper(ref inList));
+					inList = await Task.Run(() => FilterWrapper(inList));
 					asyncPreprocessed = inList;
 					Refresh(false);
 				}, true);
@@ -66,9 +68,9 @@ namespace BetterSongList.HarmonyPatches {
 			recallLast(ml);
 		}
 
-		static void FilterWrapper(ref IPreviewBeatmapLevel[] previewBeatmapLevels) {
-			if(filter?.isReady != true && sorter?.isReady != true)
-				return;
+		static async Task<IPreviewBeatmapLevel[]> FilterWrapper(IPreviewBeatmapLevel[] previewBeatmapLevels) {
+			if(filter?.isReady != true)
+				return previewBeatmapLevels;
 
 #if TRACE
 			Plugin.Log.Debug("FilterWrapper()");
@@ -80,27 +82,28 @@ namespace BetterSongList.HarmonyPatches {
 				if(filter?.isReady == true)
 					outV = outV.Where(filter.GetValueFor);
 
-				if(sorter?.isReady == true) {
-					if(sorter is ISorterPrimitive) {
-						((ISorterPrimitive)sorter).DoSort(ref outV);
-					} else {
-						outV = outV.OrderBy(x => x, sorter);
-					}
+				if(sorter != null) {
+					await sorter.NotifyChange(previewBeatmapLevels, true).ConfigureAwait(false);
+					outV = sorter.ResultLevels.value;
 				}
 
-				previewBeatmapLevels = outV.ToArray();
+				if(sorter is AdaptedSortFilter adapted && adapted.Sorter is ISorterWithLegend && Config.Instance.EnableAlphabetScrollbar)
+					customLegend = ((ISorterWithLegend)adapted.Sorter).BuildLegend(previewBeatmapLevels);
+				else if(sorter is ILegendProvider legendProvider) {
+					customLegend = legendProvider.Legend.value.Select(x => new KeyValuePair<string, int>(x.Label, x.Index)).ToList();
+				}
 
-				if(sorter is ISorterWithLegend && Config.Instance.EnableAlphabetScrollbar)
-					customLegend = ((ISorterWithLegend)sorter).BuildLegend(previewBeatmapLevels);
+				return outV.ToArray();
 			} catch(Exception ex) {
 				Plugin.Log.Warn(string.Format("FilterWrapper() Exception: {0}", ex));
 			}
+			return previewBeatmapLevels;
 		}
 
 		static CancellationTokenSource sortCancelSrc;
 
 		static bool PrepareStuffIfNecessary(Action cb = null, bool cbOnAlreadyPrepared = false) {
-			if(sorter?.isReady == false || filter?.isReady == false) {
+			if(filter?.isReady == false) {
 #if TRACE
 				Plugin.Log.Debug("PrepareStuffIfNecessary()->Prepare");
 #endif
@@ -109,7 +112,6 @@ namespace BetterSongList.HarmonyPatches {
 				var thisSrc = sortCancelSrc = new CancellationTokenSource();
 
 				Task.WhenAll(new[] {
-					sorter?.isReady == false ? sorter.Prepare(thisSrc.Token) : Task.CompletedTask,
 					filter?.isReady == false ? filter.Prepare(thisSrc.Token) : Task.CompletedTask
 				}).ContinueWith(x => {
 #if TRACE
@@ -164,11 +166,11 @@ namespace BetterSongList.HarmonyPatches {
 			//Console.WriteLine("=> {0}", new System.Diagnostics.StackTrace().ToString());
 
 			// If this is true the default Alphabet scrollbar is processed / shown - We dont want that when we use a custom filter
-			if(sorter?.isReady == true)
+			if(sorter is AdaptedSortFilter adapted && adapted.Sorter?.isReady == true)
 				beatmapLevelsAreSorted = false;
 
 			if(PrepareStuffIfNecessary(() => Refresh(true))) {
-				Plugin.Log.Debug(string.Format("Stuff isnt ready yet... Preparing it and then reloading list: Sorter {0}, Filter {1}", sorter?.isReady, filter?.isReady));
+				Plugin.Log.Debug(string.Format("Stuff isnt ready yet... Preparing it and then reloading list: Sorter {0}, Filter {1}", null, filter?.isReady));
 			}
 
 			XD.FunnyNull(FilterUI.persistentNuts._filterLoadingIndicator)?.gameObject.SetActive(false);
@@ -183,7 +185,9 @@ namespace BetterSongList.HarmonyPatches {
 			}
 
 			// Passing these explicitly for thread safety
-			FilterWrapper(ref previewBeatmapLevels);
+			var sortTask = FilterWrapper(previewBeatmapLevels);
+			sortTask.Wait();
+			previewBeatmapLevels = sortTask.Result;
 		}
 
 
