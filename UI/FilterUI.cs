@@ -50,7 +50,7 @@ namespace BetterSongList.UI {
 			{ "Unplayed", FilterMethods.unplayed },
 			{ "Played", FilterMethods.played },
 			{ "Requirements", FilterMethods.requirements },
-			{ "Not on Beatsaver", FilterMethods.notOnBeatsaver },
+			// TODO: { "Not on Beatsaver", FilterMethods.notOnBeatsaver },
 			{ "Unranked", FilterMethods.unranked },
 		};
 
