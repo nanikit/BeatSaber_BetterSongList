@@ -1,27 +1,24 @@
 ﻿using BetterSongList.Api;
 using BetterSongList.SortModels;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace BetterSongList.Sorters {
 	internal class AdaptedSortFilter : ISortFilter {
 		public AdaptedSortFilter(string name, ISorter sorter) {
 			Name = name;
 			Sorter = sorter;
-			IsVisible.value = true;
 		}
 
 		public ISorter Sorter { get; private set; }
 
 		public string Name { get; private set; }
 
-		public ObservableVariable<bool> IsVisible { get; private set; } = new ObservableVariable<bool>();
+		public event Action<ISortFilterResult> OnResultChanged;
 
-		public ObservableVariable<IEnumerable<IPreviewBeatmapLevel>> ResultLevels { get; private set; } = new ObservableVariable<IEnumerable<IPreviewBeatmapLevel>>();
-
-		public async Task NotifyChange(IEnumerable<IPreviewBeatmapLevel> newLevels, bool isSelected = false, CancellationToken? token = null) {
+		public async void NotifyChange(IEnumerable<IPreviewBeatmapLevel> newLevels, bool isSelected, CancellationToken? token) {
 			if(!Sorter.isReady) {
 				await Sorter.Prepare(CancellationToken.None).ConfigureAwait(false);
 			}
@@ -30,9 +27,10 @@ namespace BetterSongList.Sorters {
 			}
 			if(Sorter is BasicSongDetailsSorterWithLegend sorter) {
 				sorter.DoSort(ref newLevels);
-				ResultLevels.value = newLevels;
+				var legend = sorter.BuildLegend(newLevels.ToArray()).Select(x => (x.Key, x.Value));
+				OnResultChanged(new SortFilterResult(newLevels, legend));
 			} else {
-				ResultLevels.value = newLevels.OrderBy(x => x, Sorter).ToList();
+				OnResultChanged(new SortFilterResult(newLevels.OrderBy(x => x, Sorter)));
 			}
 		}
 	}

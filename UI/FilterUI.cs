@@ -69,14 +69,14 @@ namespace BetterSongList.UI {
 #if DEBUG
 			Plugin.Log.Warn(string.Format("Setting Sort to {0}", selected));
 #endif
-			if(HookLevelCollectionTableSet.sorter != newSort) {
+			if(HookLevelCollectionTableSet.Sorter != newSort) {
 				if(storeToConfig)
 					Config.Instance.LastSort = selected;
 
-				HookLevelCollectionTableSet.sorter = newSort;
+				HookLevelCollectionTableSet.Sorter = newSort;
 				RestoreTableScroll.ResetScroll();
 				if(refresh)
-					HookLevelCollectionTableSet.Refresh(true);
+					HookLevelCollectionTableSet.Refresh();
 			}
 
 			XD.FunnyNull(persistentNuts._sortDropdown)?.SelectCellWithIdx(_sortOptions.IndexOf(selected));
@@ -107,28 +107,28 @@ namespace BetterSongList.UI {
 				HookLevelCollectionTableSet.filter = filterOptions[selected];
 				RestoreTableScroll.ResetScroll();
 				if(refresh)
-					HookLevelCollectionTableSet.Refresh(true);
+					HookLevelCollectionTableSet.Refresh();
 			}
 
 			XD.FunnyNull(persistentNuts._filterDropdown)?.SelectCellWithIdx(_filterOptions.IndexOf(selected));
 		}
 
 		internal static void SetSortDirection(bool ascending, bool refresh = true) {
-			if(HookLevelCollectionTableSet.sorter == null)
+			if(HookLevelCollectionTableSet.Sorter == null)
 				return;
 
 			if(Config.Instance.SortAsc != ascending) {
 				Config.Instance.SortAsc = ascending;
 				RestoreTableScroll.ResetScroll();
 				if(refresh)
-					HookLevelCollectionTableSet.Refresh(true);
+					HookLevelCollectionTableSet.Refresh();
 			}
 
 			XD.FunnyNull(persistentNuts._sortDirection)?.SetText(ascending ? "▲" : "▼");
 		}
 
 		static void ToggleSortDirection() {
-			if(HookLevelCollectionTableSet.sorter == null)
+			if(HookLevelCollectionTableSet.Sorter == null)
 				return;
 
 			SetSortDirection(!Config.Instance.SortAsc);
@@ -217,7 +217,7 @@ namespace BetterSongList.UI {
 			HackDropdown(_filterDropdown);
 
 			foreach(var x in sortOptions) {
-				if(x.Value == HookLevelCollectionTableSet.sorter) {
+				if(x.Value == HookLevelCollectionTableSet.Sorter) {
 					SetSort(x.Key, false, false);
 					break;
 				}
