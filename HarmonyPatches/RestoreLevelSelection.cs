@@ -1,7 +1,10 @@
 ﻿using BetterSongList.UI;
 using BetterSongList.Util;
 using HarmonyLib;
+using HMUI;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using static SelectLevelCategoryViewController;
 
 namespace BetterSongList.HarmonyPatches {
@@ -43,6 +46,22 @@ namespace BetterSongList.HarmonyPatches {
 	[HarmonyPatch(typeof(AnnotatedBeatmapLevelCollectionsGridView), nameof(AnnotatedBeatmapLevelCollectionsGridView.CloseLevelCollection))]
 	static class CloseLevelCollectionFix {
 		static bool Prefix(AnnotatedBeatmapLevelCollectionsGridView __instance) => __instance._gridView.columnCount != 0;
+	}
+
+	[HarmonyPatch(typeof(LevelCollectionNavigationController), nameof(LevelCollectionNavigationController.DidActivate))]
+	static class RestoreCollectionWithoutPack {
+		static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions) =>
+			Transpilers.MethodReplacer(instructions,
+				AccessTools.Method(typeof(ContainerViewController), nameof(ContainerViewController.SetChildViewControllers)),
+				AccessTools.Method(typeof(RestoreCollectionWithoutPack), nameof(SetChildViewControllers)));
+
+		static void SetChildViewControllers(LevelCollectionNavigationController controller, ViewController[] viewControllers) {
+			// All/Favorites clear _levelPack, but initial activation still adds pack details when no song is selected.
+			// Keep the restored collection visible without activating that uninitialized view.
+			controller.SetChildViewControllers(controller._levelPack == null
+				? viewControllers.Where(view => view != controller._levelPackDetailViewController).ToArray()
+				: viewControllers);
+		}
 	}
 
 	[HarmonyPatch(typeof(LevelSelectionFlowCoordinator), nameof(LevelSelectionFlowCoordinator.DidActivate))]
